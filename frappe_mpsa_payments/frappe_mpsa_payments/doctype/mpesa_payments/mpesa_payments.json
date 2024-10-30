@@ -5,10 +5,10 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "company",
+  "customer",
   "currency",
   "column_break_sbgx",
-  "customer",
+  "company",
   "filters_section",
   "from_invoice_date",
   "from_mpesa_payment_date",
@@ -50,7 +50,8 @@
    "fieldname": "currency",
    "fieldtype": "Link",
    "label": "Currency",
-   "options": "Currency"
+   "options": "Currency",
+   "read_only": 1
   },
   {
    "collapsible": 1,
@@ -126,7 +127,7 @@
  "is_virtual": 1,
  "issingle": 1,
  "links": [],
- "modified": "2024-10-24 07:12:51.700054",
+ "modified": "2024-10-30 07:46:40.558666",
  "modified_by": "Administrator",
  "module": "Frappe Mpsa Payments",
  "name": "Mpesa Payments",

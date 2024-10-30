@@ -106,6 +106,7 @@ frappe.ui.form.on("Sales Invoice", {
                       frm.add_child("payments", {
                         mode_of_payment: payment.mode_of_payment,
                         amount: payment.transamount,
+                        reference_no: payment.transid,
                       });
                       frm.refresh_field("payments");
                       dialog.hide();

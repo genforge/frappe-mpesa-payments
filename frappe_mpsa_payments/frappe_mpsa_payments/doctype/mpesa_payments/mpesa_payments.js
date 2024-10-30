@@ -16,7 +16,7 @@ frappe.ui.form.on("Mpesa Payments", {
   },
 
   customer(frm) {
-    let fetch_btn = frm.add_custom_button(__("Fetch Entries"), () => {
+    let fetch_btn = frm.add_custom_button(__("Get Unreconciled Entries"), () => {
         frm.trigger("fetch_entries");
       });
   },
@@ -154,6 +154,7 @@ frappe.ui.form.on("Mpesa Payments", {
                 frm.refresh_field("invoices");
                 frm.refresh_field("mpesa_payments");
 
+                check_for_process_payments_button(frm);
             } else {
                 frappe.msgprint({
                     title: __("Payment Processing Failed"),
@@ -169,7 +170,7 @@ frappe.ui.form.on("Mpesa Payments", {
 
 function check_for_process_payments_button(frm) {
   if (frm.doc.invoices.length > 0 && frm.doc.mpesa_payments.length > 0) {
-    let process_btn = frm.add_custom_button(__("Process Payments"), () => {
+    let process_btn = frm.add_custom_button(__("Allocate"), () => {
       frm.trigger("process_payments");
     });
 
