@@ -1,7 +1,7 @@
 // Copyright (c) 2024, Navari Limited and contributors
 // For license information, please see license.txt
 
-frappe.ui.form.on("Mpesa Payments", {
+frappe.ui.form.on("Mpesa Payment Reconciliation", {
   onload(frm) {
     const default_company = frappe.defaults.get_user_default("Company");
     frm.set_value("company", default_company);
@@ -12,25 +12,27 @@ frappe.ui.form.on("Mpesa Payments", {
 
     frm.set_df_property("invoices", "cannot_add_rows", true);
     frm.set_df_property("mpesa_payments", "cannot_add_rows", true);
-    
   },
 
   customer(frm) {
-    let fetch_btn = frm.add_custom_button(__("Get Unreconciled Entries"), () => {
+    let fetch_btn = frm.add_custom_button(
+      __("Get Unreconciled Entries"),
+      () => {
         frm.trigger("fetch_entries");
-      });
+      }
+    );
   },
 
   onload_post_render(frm) {
-    frm.set_query('invoice_name', function() {
-        return {
-            filters: {
-                docstatus: 1,
-                outstanding_amount: ['>', 0],
-                company: frm.doc.company,
-                customer: frm.doc.customer,
-            }
-        };
+    frm.set_query("invoice_name", function () {
+      return {
+        filters: {
+          docstatus: 1,
+          outstanding_amount: [">", 0],
+          company: frm.doc.company,
+          customer: frm.doc.customer,
+        },
+      };
     });
   },
 
@@ -119,53 +121,40 @@ frappe.ui.form.on("Mpesa Payments", {
   },
 
   process_payments(frm, retryCount = 0) {
-
     let unpaid_invoices = frm.doc.invoices || [];
     let mpesa_payments = frm.doc.mpesa_payments || [];
 
     if (unpaid_invoices.length === 0 || mpesa_payments.length === 0) {
       frappe.msgprint({
         title: __("No Entries Found"),
-        message: __("Please add at least one invoice and one Mpesa payment for processing."),
+        message: __(
+          "Please add at least one invoice and one Mpesa payment for processing."
+        ),
         indicator: "orange",
       });
       return;
     }
-    
-    let invoice_names = unpaid_invoices.map(invoice => invoice.invoice);
-    let mpesa_names = mpesa_payments.map(payment => payment.payment_id);
+
+    let invoice_names = unpaid_invoices.map((invoice) => invoice.invoice);
+    let mpesa_names = mpesa_payments.map((payment) => payment.payment_id);
 
     frappe.call({
-        method: "frappe_mpsa_payments.frappe_mpsa_payments.api.payment_entry.process_mpesa_c2b_reconciliation",
-        args: {
-            invoice_names: invoice_names,
-            mpesa_names: mpesa_names
-        },
-        callback: function (response) {
-            if (response) {
-                frappe.msgprint({
-                    title: __("Success"),
-                    message: __("Payment reconciliation successful."),
-                    indicator: "green",
-                });
+      method:
+        "frappe_mpsa_payments.frappe_mpsa_payments.api.payment_entry.process_mpesa_c2b_reconciliation",
+      args: {
+        invoice_names: invoice_names,
+        mpesa_names: mpesa_names,
+      },
+      callback: function () {
+        frm.clear_table("invoices");
+        frm.clear_table("mpesa_payments");
+        frm.refresh_field("invoices");
+        frm.refresh_field("mpesa_payments");
 
-                frm.clear_table("invoices");
-                frm.clear_table("mpesa_payments");
-                frm.refresh_field("invoices");
-                frm.refresh_field("mpesa_payments");
-
-                check_for_process_payments_button(frm);
-            } else {
-                frappe.msgprint({
-                    title: __("Payment Processing Failed"),
-                    message: __("Some payments could not be processed. Please try again."),
-                    indicator: "red",
-                });
-            }
-        }
-    })
+        check_for_process_payments_button(frm);
+      },
+    });
   },
-
 });
 
 function check_for_process_payments_button(frm) {
@@ -175,5 +164,8 @@ function check_for_process_payments_button(frm) {
     });
 
     process_btn.addClass("btn-primary");
+  }
+  else {
+    frm.remove_custom_button("Allocate");
   }
 }

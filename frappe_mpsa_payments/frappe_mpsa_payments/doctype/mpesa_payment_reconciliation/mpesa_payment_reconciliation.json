@@ -18,9 +18,9 @@
   "column_break_asbv",
   "invoice_name",
   "full_name",
-  "sales_invoices_section",
+  "section_break_czej",
   "invoices",
-  "section_break_lqip",
+  "section_break_abzl",
   "mpesa_payments"
  ],
  "fields": [
@@ -86,28 +86,6 @@
    "label": "To Mpesa Payment Date"
   },
   {
-   "depends_on": "eval: doc.customer",
-   "fieldname": "sales_invoices_section",
-   "fieldtype": "Section Break"
-  },
-  {
-   "fieldname": "invoices",
-   "fieldtype": "Table",
-   "label": "Invoices",
-   "options": "Mpesa Payments Invoices"
-  },
-  {
-   "depends_on": "eval: doc.customer",
-   "fieldname": "section_break_lqip",
-   "fieldtype": "Section Break"
-  },
-  {
-   "fieldname": "mpesa_payments",
-   "fieldtype": "Table",
-   "label": "Mpesa Payments",
-   "options": "Mpesa Draft Payments"
-  },
-  {
    "fieldname": "full_name",
    "fieldtype": "Data",
    "label": "Full Name"
@@ -121,16 +99,36 @@
    "fieldtype": "Link",
    "label": "Invoice Name",
    "options": "Sales Invoice"
+  },
+  {
+   "fieldname": "section_break_czej",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "invoices",
+   "fieldtype": "Table",
+   "label": "Invoices",
+   "options": "Mpesa Payments Invoices"
+  },
+  {
+   "fieldname": "section_break_abzl",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "mpesa_payments",
+   "fieldtype": "Table",
+   "label": "Mpesa Payments",
+   "options": "Mpesa Draft Payments"
   }
  ],
  "index_web_pages_for_search": 1,
  "is_virtual": 1,
  "issingle": 1,
  "links": [],
- "modified": "2024-10-30 07:46:40.558666",
+ "modified": "2024-10-31 12:04:36.731193",
  "modified_by": "Administrator",
  "module": "Frappe Mpsa Payments",
- "name": "Mpesa Payments",
+ "name": "Mpesa Payment Reconciliation",
  "owner": "Administrator",
  "permissions": [
   {

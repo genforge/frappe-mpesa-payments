@@ -20,7 +20,8 @@
    "in_preview": 1,
    "in_standard_filter": 1,
    "label": "Payment ID",
-   "options": "Mpesa C2B Payment Register"
+   "options": "Mpesa C2B Payment Register",
+   "read_only": 1
   },
   {
    "fieldname": "full_name",
@@ -28,7 +29,8 @@
    "in_list_view": 1,
    "in_preview": 1,
    "in_standard_filter": 1,
-   "label": "Full Name"
+   "label": "Full Name",
+   "read_only": 1
   },
   {
    "fieldname": "date",
@@ -36,7 +38,8 @@
    "in_list_view": 1,
    "in_preview": 1,
    "in_standard_filter": 1,
-   "label": "Date"
+   "label": "Date",
+   "read_only": 1
   },
   {
    "fieldname": "amount",
@@ -44,7 +47,8 @@
    "in_list_view": 1,
    "in_preview": 1,
    "in_standard_filter": 1,
-   "label": "Amount"
+   "label": "Amount",
+   "read_only": 1
   },
   {
    "fieldname": "column_break_fnjs",
@@ -55,7 +59,7 @@
  "is_virtual": 1,
  "istable": 1,
  "links": [],
- "modified": "2024-10-17 07:35:16.568396",
+ "modified": "2024-10-31 14:23:46.793043",
  "modified_by": "Administrator",
  "module": "Frappe Mpsa Payments",
  "name": "Mpesa Draft Payments",

@@ -5,7 +5,7 @@ import frappe
 from frappe.model.document import Document
 
 
-class MpesaPayments(Document):
+class MpesaPaymentReconciliation(Document):
 
 	_table_fieldnames = []
 

@@ -20,7 +20,8 @@
    "in_preview": 1,
    "in_standard_filter": 1,
    "label": "Invoice",
-   "options": "Sales Invoice"
+   "options": "Sales Invoice",
+   "read_only": 1
   },
   {
    "fieldname": "date",
@@ -28,7 +29,8 @@
    "in_list_view": 1,
    "in_preview": 1,
    "in_standard_filter": 1,
-   "label": "Date"
+   "label": "Date",
+   "read_only": 1
   },
   {
    "fieldname": "column_break_uznl",
@@ -40,7 +42,8 @@
    "in_list_view": 1,
    "in_preview": 1,
    "in_standard_filter": 1,
-   "label": "Total"
+   "label": "Total",
+   "read_only": 1
   },
   {
    "fieldname": "outstanding_amount",
@@ -48,14 +51,15 @@
    "in_list_view": 1,
    "in_preview": 1,
    "in_standard_filter": 1,
-   "label": "Outstanding Amount"
+   "label": "Outstanding Amount",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "is_virtual": 1,
  "istable": 1,
  "links": [],
- "modified": "2024-10-22 08:37:00.706403",
+ "modified": "2024-10-31 14:23:20.897922",
  "modified_by": "Administrator",
  "module": "Frappe Mpsa Payments",
  "name": "Mpesa Payments Invoices",
