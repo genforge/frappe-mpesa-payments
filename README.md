@@ -6,7 +6,8 @@ Frappe Mpsa Payments is a Frappe-based application that integrates with Safarico
 
   - **Mpesa Settings:** Configure credentials for Safaricom's Daraja API for **Mpesa Express**, **Mpesa C2B** and **Mpesa B2C**
   - **Mpesa C2B Payment Register URL:** Enables C2B payment setup, allowing the registration of URLs for incoming Mpesa payments.
-  - **Mpesa Payments DocType:** View and reconcile draft Mpesa payments with unpaid sales invoices
+  - **Mpesa C2B Payment Register:** Records individual incoming payments recieved via the C2B callback.
+  - **Mpesa Payment Reconciliation:** View and reconcile draft Mpesa payments with unpaid sales invoices.
 
 ## Key Functions
 #### DocTypes
@@ -77,7 +78,7 @@ The Payment Gateway DocType facilitates the integration of Mpesa with your ERPNe
 
 ![Screenshot from 2024-10-30 16-06-27](https://github.com/user-attachments/assets/03d795f3-1b44-4011-8c9f-330ea747a09c)
 
-<h4>Mpesa Payments</h4>
+<h4>Mpesa Payment Reconciliation</h4>
 
 This DocType lists and organizes draft Mpesa payments, making it possible to reconcile these draft(s) mpesa payments with pending/unpaid invoices. This DocType streamlines the reconciliation process by matching Mpesa transactions with unpaid sales invoices.
 
