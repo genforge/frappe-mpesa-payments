@@ -108,8 +108,7 @@
    "fieldname": "invoices",
    "fieldtype": "Table",
    "label": "Invoices",
-   "options": "Mpesa Payments Invoices",
-   "read_only": 1
+   "options": "Mpesa Payments Invoices"
   },
   {
    "fieldname": "section_break_abzl",
@@ -119,15 +118,14 @@
    "fieldname": "mpesa_payments",
    "fieldtype": "Table",
    "label": "Mpesa Payments",
-   "options": "Mpesa Draft Payments",
-   "read_only": 1
+   "options": "Mpesa Draft Payments"
   }
  ],
  "index_web_pages_for_search": 1,
  "is_virtual": 1,
  "issingle": 1,
  "links": [],
- "modified": "2024-10-31 11:01:38.554837",
+ "modified": "2024-10-31 12:04:36.731193",
  "modified_by": "Administrator",
  "module": "Frappe Mpsa Payments",
  "name": "Mpesa Payment Reconciliation",
