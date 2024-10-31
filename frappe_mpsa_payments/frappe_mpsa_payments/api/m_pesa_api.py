@@ -159,7 +159,6 @@ def submit_instant_mpesa_payment():
 def process_mpesa_payment(mpesa_payment, customer, submit_payment=False):
     try:
         doc = frappe.get_doc("Mpesa C2B Payment Register", mpesa_payment)
-        print(f"Mpesa Payment: {doc}")
         doc.customer = customer
         # doc.mode_of_payment = mode_of_payment
         #TODO: after testing, mode of payment

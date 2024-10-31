@@ -1,7 +1,7 @@
 // Copyright (c) 2024, Navari Limited and contributors
 // For license information, please see license.txt
 
-frappe.ui.form.on("Mpesa Payments", {
+frappe.ui.form.on("Mpesa Payment Reconciliation", {
   onload(frm) {
     const default_company = frappe.defaults.get_user_default("Company");
     frm.set_value("company", default_company);
