@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 import frappe, requests
 from frappe import _
 from requests.auth import HTTPBasicAuth
+from frappe.utils.response import json_handler
 import json
 
 
@@ -189,3 +190,52 @@ def get_mode_of_payment(mpesa_doc):
         mode_of_payment = frappe.get_value("Mpesa C2B Payment Register URL", {"till_number": business_short_code, "register_status": "Success"}, "mode_of_payment")
     return mode_of_payment
     
+@frappe.whitelist(allow_guest=True)
+def handle_transaction_status_result():
+    """Handle the transaction status response from Mpesa"""
+    try:
+        response = frappe.request.data
+        response_data = json.loads(response)
+        
+        # Extract necessary fields from the response data
+        result_parameters = {
+            param["Key"]: param.get("Value", "")
+            for param in response_data.get("Result", {}).get("ResultParameters", {}).get("ResultParameter", [])
+        }
+        # Get the customer name
+        customer_name = result_parameters.get("DebitPartyName", "").split(" - ")[1]
+        
+        # Map fields from the response to the DocType
+        doc = frappe.new_doc("Mpesa C2B Payment Register")
+        doc.transactiontype = result_parameters.get("TransactionReason", "")
+        doc.transid = result_parameters.get("ReceiptNo", "")
+        doc.transtime = result_parameters.get("FinalisedTime", "")
+        doc.transamount = float(result_parameters.get("Amount", 0))
+        doc.businessshortcode = response_data.get("Result", {}).get("OriginatorConversationID", "")
+        doc.msisdn = result_parameters.get("DebitPartyName", "").split(" - ")[0]  # Extract MSISDN if present
+        doc.firstname = customer_name.split(" ")[0]
+        doc.lastname = customer_name.split(" ")[-1]
+        
+        # Insert the new document
+        doc.insert(ignore_permissions=True)
+        frappe.db.commit()
+        
+        return {"status": "success", "message": "Transaction processed successfully"}
+
+    except Exception as e:
+        frappe.log_error(f"Mpesa Transaction Status Error: {str(e)}")
+        return {"status": "error", "message": str(e)}
+    
+
+@frappe.whitelist(allow_guest=True)
+def handle_queue_timeout():
+    """Handle the timeout response from Mpesa."""
+    try:
+        response = frappe.request.data
+        response_data = json.loads(response, object_hook=json_handler)
+        frappe.log(f"Mpesa Queue Timeout: {response_data}")
+        # Process and save timeout response
+        return {"status": "timeout"}
+    except Exception as e:
+        frappe.log_error(f"Mpesa Timeout Error: str(e)")
+        return {"status": "error", "message": str(e)}

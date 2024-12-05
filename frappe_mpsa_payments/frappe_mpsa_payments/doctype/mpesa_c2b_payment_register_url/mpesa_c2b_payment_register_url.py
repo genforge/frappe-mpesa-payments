@@ -6,6 +6,7 @@ import frappe, requests
 from frappe.model.document import Document
 from frappe.utils import get_request_site_address
 from frappe_mpsa_payments.frappe_mpsa_payments.api.m_pesa_api import get_token
+from ..mpesa_settings.mpesa_connector import MpesaConnector
 
 class MpesaC2BPaymentRegisterURL(Document):
     def validate(self):
@@ -73,3 +74,35 @@ class MpesaC2BPaymentRegisterURL(Document):
         except requests.exceptions.RequestException as err:
             # Handle other exceptions
             frappe.msgprint(f"Request Exception: {err}")
+
+    @frappe.whitelist()
+    def trigger_transaction_status(self, transaction_id, remarks="OK"):
+
+        queue_timeout_url = get_request_site_address(True) + "/api/method/frappe_mpsa_payments.frappe_mpsa_payments.api.m_pesa_api.handle_queue_timeout"
+
+        result_url = get_request_site_address(True) + "/api/method/frappe_mpsa_payments.frappe_mpsa_payments.api.m_pesa_api.handle_transaction_status_result"
+
+        settings = frappe.get_doc("Mpesa Settings", self.mpesa_settings)
+        connector = MpesaConnector(
+            env="production" if not settings.sandbox else "sandbox",
+            app_key=settings.consumer_key,
+            app_secret=settings.get_password("consumer_secret")
+        )
+
+
+        try:
+            response = connector.transaction_status(
+                initiator=settings.initiator_name,
+                security_credential=settings.security_credential,
+                transaction_id=transaction_id,
+                party_a=settings.business_shortcode if not settings.sandbox else settings.till_number,
+                identifier_type=4,  # Assuming Organization Short Code
+                remarks=remarks,
+                occasion="",
+                queue_timeout_url=queue_timeout_url,
+                result_url=result_url
+            )
+            return response
+        except Exception as e:
+            frappe.log_error(title="Mpesa Transaction Status Error", message=str(e))
+            return {"status": "error", "message": str(e)}
