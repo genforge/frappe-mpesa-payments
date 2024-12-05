@@ -196,30 +196,46 @@ def handle_transaction_status_result():
     try:
         response = frappe.request.data
         response_data = json.loads(response)
+
+        # Log the entire response for debugging purposes (optional)
+        frappe.log_error(f"Full response from Mpesa API: {response_data}")
+
+        originator_conversation_id = response_data.get("Result", {}).get("OriginatorConversationID", None)
+        
+        if not originator_conversation_id:
+            frappe.log_error("OriginatorConversationID not found in the response.")
         
         # Extract necessary fields from the response data
         result_parameters = {
             param["Key"]: param.get("Value", "")
             for param in response_data.get("Result", {}).get("ResultParameters", {}).get("ResultParameter", [])
         }
-        # Get the customer name
-        customer_name = result_parameters.get("DebitPartyName", "").split(" - ")[1]
+
+        # Safely handle DebitPartyName
+        debit_party_name = result_parameters.get("DebitPartyName", "")
+        if " - " in debit_party_name:
+            msisdn, customer_name = debit_party_name.split(" - ", 1)
+        else:
+            msisdn, customer_name = debit_party_name, ""
         
+        firstname = customer_name.split(" ")[0] if customer_name else ""
+        lastname = customer_name.split(" ")[-1] if customer_name else ""
+
         # Map fields from the response to the DocType
         doc = frappe.new_doc("Mpesa C2B Payment Register")
         doc.transactiontype = result_parameters.get("TransactionReason", "")
         doc.transid = result_parameters.get("ReceiptNo", "")
         doc.transtime = result_parameters.get("FinalisedTime", "")
         doc.transamount = float(result_parameters.get("Amount", 0))
-        doc.businessshortcode = response_data.get("Result", {}).get("OriginatorConversationID", "")
-        doc.msisdn = result_parameters.get("DebitPartyName", "").split(" - ")[0]  # Extract MSISDN if present
-        doc.firstname = customer_name.split(" ")[0]
-        doc.lastname = customer_name.split(" ")[-1]
+        doc.businessshortcode = originator_conversation_id
+        doc.msisdn = msisdn
+        doc.firstname = firstname
+        doc.lastname = lastname
         
         # Insert the new document
         doc.insert(ignore_permissions=True)
         frappe.db.commit()
-        
+
         return {"status": "success", "message": "Transaction processed successfully"}
 
     except Exception as e:
