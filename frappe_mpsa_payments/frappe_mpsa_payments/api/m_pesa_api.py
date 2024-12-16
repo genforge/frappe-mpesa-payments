@@ -198,7 +198,9 @@ def handle_transaction_status_result():
         response_data = json.loads(response)
 
         # Log the entire response for debugging purposes (optional)
-        frappe.log_error(f"Full response from Mpesa API: {response_data}")
+        if len(response_data) > 140:
+            response_data = response_data[:100] + "..."
+            frappe.log_error(f"Full response from Mpesa API: {response_data}")
 
         originator_conversation_id = response_data.get("Result", {}).get("OriginatorConversationID", None)
         
@@ -239,8 +241,12 @@ def handle_transaction_status_result():
         return {"status": "success", "message": "Transaction processed successfully"}
 
     except Exception as e:
-        frappe.log_error(f"Mpesa Transaction Status Error: {str(e)}")
-        return {"status": "error", "message": str(e)}
+        
+        error_message = f"Mpesa Transaction Status Error: {str(e)}"
+
+        if len(response_data) > 140:
+            response_data = json.dumps(response_data)[:100] + "..."
+        frappe.log_error(f"{error_message}\nResponse: {response_data}", "Mpesa API Error")
     
 
 @frappe.whitelist(allow_guest=True)
