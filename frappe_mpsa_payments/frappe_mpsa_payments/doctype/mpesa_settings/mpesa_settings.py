@@ -62,6 +62,11 @@ class MpesaSettings(Document):
 
             self.security_credential = base64.b64encode(ciphertext).decode("utf-8")
 
+    @frappe.whitelist()
+    def get_payment_url(self, **kwargs) -> str:
+        """Return the payment URL"""
+        return "/all-products"
+    
     def on_update(self) -> None:
         """On Update Hook"""
         from ....utils.utils import create_payment_gateway
@@ -145,7 +150,7 @@ class MpesaSettings(Document):
     ) -> None:
         """Response received from API calls returns a global identifier for each transaction, this code is returned during the callback."""
         # check error response
-        if response["requestId"]:
+        if "requestId" in response:
             req_name = response["requestId"]
             error = response
         else:
@@ -166,8 +171,9 @@ def generate_stk_push(**kwargs) -> str | Any:
 
     try:
         callback_url = (
-            get_request_site_address(True)
-            + "/api/method/payments.payment_gateways.doctype.mpesa_settings.mpesa_settings.verify_transaction"
+            # get_request_site_address(True)
+            "https://9836-41-80-117-181.ngrok-free.app"
+            + "/api/method/frappe_mpsa_payments.frappe_mpsa_payments.api.m_pesa_api.verify_transaction"
         )
 
         mpesa_settings = frappe.get_doc("Mpesa Settings", args.payment_gateway[6:])
@@ -184,12 +190,12 @@ def generate_stk_push(**kwargs) -> str | Any:
             app_key=mpesa_settings.consumer_key,
             app_secret=mpesa_settings.get_password("consumer_secret"),
         )
-
-        mobile_number = sanitize_mobile_number(args.sender)
-
+        phone_no='0740743521'
+        mobile_number=sanitize_mobile_number(phone_no)
+        # mobile_number = sanitize_mobile_number(args.sender)
         response = connector.stk_push(
             business_shortcode=business_shortcode,
-            amount=args.request_amount,
+            amount=1,
             passcode=mpesa_settings.get_password("online_passkey"),
             callback_url=callback_url,
             reference_code=mpesa_settings.till_number,
@@ -212,82 +218,6 @@ def generate_stk_push(**kwargs) -> str | Any:
 def sanitize_mobile_number(number: str) -> str:
     """Add country code and strip leading zeroes from the phone number."""
     return "254" + str(number).lstrip("0")
-
-
-@frappe.whitelist(allow_guest=True)
-def verify_transaction(**kwargs) -> None:
-    """Verify the transaction result received via callback from stk."""
-    transaction_response = frappe._dict(kwargs["Body"]["stkCallback"])
-
-    checkout_id = getattr(transaction_response, "CheckoutRequestID", "")
-    if not isinstance(checkout_id, str):
-        frappe.throw(_("Invalid Checkout Request ID"))
-
-    integration_request = frappe.get_doc("Integration Request", checkout_id)
-    transaction_data = frappe._dict(loads(integration_request.data))
-    total_paid = 0  # for multiple integration request made against a pos invoice
-    success = False  # for reporting successfull callback to point of sale ui
-
-    if transaction_response["ResultCode"] == 0:
-        if (
-            integration_request.reference_doctype
-            and integration_request.reference_docname
-        ):
-            try:
-                item_response = transaction_response["CallbackMetadata"]["Item"]
-                amount = fetch_param_value(item_response, "Amount", "Name")
-                mpesa_receipt = fetch_param_value(
-                    item_response, "MpesaReceiptNumber", "Name"
-                )
-                pr = frappe.get_doc(
-                    integration_request.reference_doctype,
-                    integration_request.reference_docname,
-                )
-
-                mpesa_receipts, completed_payments = (
-                    get_completed_integration_requests_info(
-                        integration_request.reference_doctype,
-                        integration_request.reference_docname,
-                        checkout_id,
-                    )
-                )
-
-                total_paid = amount + sum(completed_payments)
-                mpesa_receipts = ", ".join(mpesa_receipts + [mpesa_receipt])
-
-                if total_paid >= pr.grand_total:
-                    pr.run_method("on_payment_authorized", "Completed")
-                    success = True
-
-                frappe.db.set_value(
-                    "POS Invoice",
-                    pr.reference_name,
-                    "mpesa_receipt_number",
-                    mpesa_receipts,
-                )
-                integration_request.handle_success(transaction_response)
-            except Exception:
-                integration_request.handle_failure(transaction_response)
-                frappe.log_error("Mpesa: Failed to verify transaction")
-
-    else:
-        integration_request.handle_failure(transaction_response)
-
-    frappe.publish_realtime(
-        event="process_phone_payment",
-        doctype="POS Invoice",
-        docname=transaction_data.payment_reference,
-        user=integration_request.owner,
-        message={
-            "amount": total_paid,
-            "success": success,
-            "failure_message": (
-                transaction_response["ResultDesc"]
-                if transaction_response["ResultCode"] != 0
-                else ""
-            ),
-        },
-    )
 
 
 def get_completed_integration_requests_info(
