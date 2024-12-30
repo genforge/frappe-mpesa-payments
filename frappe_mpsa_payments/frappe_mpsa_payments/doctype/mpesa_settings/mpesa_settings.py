@@ -171,8 +171,8 @@ def generate_stk_push(**kwargs) -> str | Any:
 
     try:
         callback_url = (
-            # get_request_site_address(True)
-            "https://9836-41-80-117-181.ngrok-free.app"
+            get_request_site_address(True)
+            # "https://9836-41-80-117-181.ngrok-free.app"
             + "/api/method/frappe_mpsa_payments.frappe_mpsa_payments.api.m_pesa_api.verify_transaction"
         )
 
@@ -190,12 +190,12 @@ def generate_stk_push(**kwargs) -> str | Any:
             app_key=mpesa_settings.consumer_key,
             app_secret=mpesa_settings.get_password("consumer_secret"),
         )
-        phone_no='0740743521'
-        mobile_number=sanitize_mobile_number(phone_no)
+        # phone_no='0740743521'
+        mobile_number=sanitize_mobile_number(args.phone_number)
         # mobile_number = sanitize_mobile_number(args.sender)
         response = connector.stk_push(
             business_shortcode=business_shortcode,
-            amount=1,
+            amount=args.request_amount,
             passcode=mpesa_settings.get_password("online_passkey"),
             callback_url=callback_url,
             reference_code=mpesa_settings.till_number,
