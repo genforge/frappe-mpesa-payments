@@ -4,6 +4,13 @@ import frappe, requests
 from frappe import _
 from requests.auth import HTTPBasicAuth
 import json
+from ..doctype.mpesa_settings.mpesa_settings import (
+    get_completed_integration_requests_info,
+    fetch_param_value,
+    
+)
+
+from json import dumps, loads
 
 
 def get_token(app_key, app_secret, base_url):
@@ -189,3 +196,80 @@ def get_mode_of_payment(mpesa_doc):
         mode_of_payment = frappe.get_value("Mpesa C2B Payment Register URL", {"till_number": business_short_code, "register_status": "Success"}, "mode_of_payment")
     return mode_of_payment
     
+
+@frappe.whitelist(allow_guest=True)
+def verify_transaction(**kwargs) -> None:
+    """Verify the transaction result received via callback from stk."""
+    
+    transaction_response = frappe._dict(kwargs["Body"]["stkCallback"])
+
+    checkout_id = getattr(transaction_response, "CheckoutRequestID", "")
+    if not isinstance(checkout_id, str):
+        frappe.throw(_("Invalid Checkout Request ID"))
+    print("=====================================")
+    print(str(transaction_response))
+    integration_request = frappe.get_doc("Integration Request", checkout_id)
+    transaction_data = frappe._dict(loads(integration_request.data))
+    total_paid = 0  
+    success = False  # for reporting successfull callback to point of sale ui
+
+    if transaction_response["ResultCode"] == 0:
+        if (
+            integration_request.reference_doctype
+            and integration_request.reference_docname
+        ):
+            try:
+                item_response = transaction_response["CallbackMetadata"]["Item"]
+                amount = fetch_param_value(item_response, "Amount", "Name")
+                mpesa_receipt = fetch_param_value(
+                    item_response, "MpesaReceiptNumber", "Name"
+                )
+                pr = frappe.get_doc(
+                    integration_request.reference_doctype,
+                    integration_request.reference_docname,
+                )
+
+                mpesa_receipts, completed_payments = (
+                    get_completed_integration_requests_info(
+                        integration_request.reference_doctype,
+                        integration_request.reference_docname,
+                        checkout_id,
+                    )
+                )
+
+                total_paid = amount + sum(completed_payments)
+                mpesa_receipts = ", ".join(mpesa_receipts + [mpesa_receipt])
+
+                if total_paid >= pr.grand_total:
+                    pr.run_method("on_payment_authorized", "Completed")
+                    success = True
+
+                frappe.db.set_value(
+                    "POS Invoice",
+                    pr.reference_name,
+                    "mpesa_receipt_number",
+                    mpesa_receipts,
+                )
+                integration_request.handle_success(transaction_response)
+            except Exception:
+                integration_request.handle_failure(transaction_response)
+                frappe.log_error("Mpesa: Failed to verify transaction")
+
+    else:
+        integration_request.handle_failure(transaction_response)
+
+    frappe.publish_realtime(
+        event="process_phone_payment",
+        doctype="POS Invoice",
+        docname=transaction_data.payment_reference,
+        user=integration_request.owner,
+        message={
+            "amount": total_paid,
+            "success": success,
+            "failure_message": (
+                transaction_response["ResultDesc"]
+                if transaction_response["ResultCode"] != 0
+                else ""
+            ),
+        },
+    )

@@ -64,3 +64,17 @@ def save_access_token(
         # TODO: Not sure what exception is thrown here. Confirm
         frappe.throw("Error Encountered")
         return False
+
+def get_payment_gateway_controller(payment_gateway):
+	"""Return payment gateway controller"""
+	gateway = frappe.get_doc("Payment Gateway", payment_gateway)
+	if gateway.gateway_controller is None:
+		try:
+			return frappe.get_doc(f"{payment_gateway} Settings")
+		except Exception:
+			frappe.throw(_("{0} Settings not found").format(payment_gateway))
+	else:
+		try:
+			return frappe.get_doc(gateway.gateway_settings, gateway.gateway_controller)
+		except Exception:
+			frappe.throw(_("{0} Settings not found").format(payment_gateway))
