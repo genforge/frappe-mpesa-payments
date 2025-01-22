@@ -196,49 +196,41 @@ def handle_transaction_status_result():
     try:
         response = frappe.request.data
         response_data = json.loads(response)
-
-        # Log the entire response for debugging purposes (optional)
-        if len(response_data) > 140:
-            response_data = response_data[:100] + "..."
-            frappe.log_error(f"Full response from Mpesa API: {response_data}")
-
-        originator_conversation_id = response_data.get("Result", {}).get("OriginatorConversationID", None)
+        result_data = response_data.get("Result", {})
+        reference_data = response_data.get("ReferenceData", {}).get("ReferenceItem", {})
+        result_parameters = response_data.get("ResultParameters", {}).get("ResultParameter", [])
         
-        if not originator_conversation_id:
-            frappe.log_error("OriginatorConversationID not found in the response.")
-        
-        # Extract necessary fields from the response data
-        result_parameters = {
-            param["Key"]: param.get("Value", "")
-            for param in response_data.get("Result", {}).get("ResultParameters", {}).get("ResultParameter", [])
-        }
-
-        # Safely handle DebitPartyName
-        debit_party_name = result_parameters.get("DebitPartyName", "")
-        if " - " in debit_party_name:
-            msisdn, customer_name = debit_party_name.split(" - ", 1)
-        else:
-            msisdn, customer_name = debit_party_name, ""
-        
-        firstname = customer_name.split(" ")[0] if customer_name else ""
-        lastname = customer_name.split(" ")[-1] if customer_name else ""
+        result_params = {param["Key"]: param.get("Value", "") for param in result_parameters}
 
         # Map fields from the response to the DocType
-        doc = frappe.new_doc("Mpesa C2B Payment Register")
-        doc.transactiontype = result_parameters.get("TransactionReason", "")
-        doc.transid = result_parameters.get("ReceiptNo", "")
-        doc.transtime = result_parameters.get("FinalisedTime", "")
-        doc.transamount = float(result_parameters.get("Amount", 0))
-        doc.businessshortcode = originator_conversation_id
-        doc.msisdn = msisdn
-        doc.firstname = firstname
-        doc.lastname = lastname
-        
-        # Insert the new document
-        doc.insert(ignore_permissions=True)
+        frappe.get_doc({
+            "doctype": "Mpesa Transaction Status",
+            "result_type": result_data.get("ResultType", 0),
+            "result_code": result_data.get("ResultCode"),
+            "result_description": result_data.get("ResultDesc", ""),
+            "originator_conversation_id": result_data.get("OriginatorConversationID", ""),
+            "conversation_id": result_data.get("ConversationID", ""),
+            "transaction_id": result_data.get("TransactionID", ""),
+            "reference_key": reference_data.get("Key", ""),
+            "reference_value": reference_data.get("Value", ""),
+            "amount": result_params.get("Amount", 0),
+            "receipt_no": result_params.get("ReceiptNo", ""),
+            "debit_party_name": result_params.get("DebitPartyName", ""),
+            "debit_party_charges": result_params.get("DebitPartyCharges", ""),
+            "transaction_status": result_params.get("TransactionStatus", ""),
+            "finalised_time": result_params.get("FinalisedTime", ""),
+            "initiated_time": result_params.get("InitiatedTime", ""),
+            "reason_type": result_params.get("ReasonType", ""),
+        }).insert(ignore_permissions=True)
+
         frappe.db.commit()
 
         return {"status": "success", "message": "Transaction processed successfully"}
+    
+    except json.JSONDecodeError as e:
+
+        frappe.log_error(f"Failed to decode JSON from Mpesa response: {str(e)}", "Mpesa API Error")
+        return {"status": "error", "message": "Invalid JSON data"}
 
     except Exception as e:
         
@@ -247,17 +239,33 @@ def handle_transaction_status_result():
         if len(response_data) > 140:
             response_data = json.dumps(response_data)[:100] + "..."
         frappe.log_error(f"{error_message}\nResponse: {response_data}", "Mpesa API Error")
-    
+        return {"status": "error", "message": error_message}    
 
 @frappe.whitelist(allow_guest=True)
 def handle_queue_timeout():
     """Handle the timeout response from Mpesa."""
     try:
         response = frappe.request.data
-        response_data = json.loads(response, object_hook=json_handler)
-        frappe.log(f"Mpesa Queue Timeout: {response_data}")
-        # Process and save timeout response
-        return {"status": "timeout"}
+        response_data = json.loads(response)
+
+        frappe.log_error(
+            title="Mpesa Queue Timeout",
+            message=f"Timeout response received: {frappe.as_json(response_data)}"
+        )
+
+        return {"status": "timeout", "message": "Timeout response logged successfully."}
+
+    except json.JSONDecodeError:
+        frappe.log_error(
+            title="Mpesa Timeout Error",
+            message="Failed to decode JSON from timeout response."
+        )
+        return {"status": "error", "message": "Invalid JSON received."}
+
     except Exception as e:
-        frappe.log_error(f"Mpesa Timeout Error: str(e)")
+        error_message = f"Mpesa Timeout Error: {str(e)}"
+        frappe.log_error(
+            title="Mpesa Timeout Error",
+            message=error_message
+        )
         return {"status": "error", "message": str(e)}
