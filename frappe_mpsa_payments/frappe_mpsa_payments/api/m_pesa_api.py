@@ -197,35 +197,45 @@ def handle_transaction_status_result():
         response = frappe.request.data
         response_data = json.loads(response)
         result_data = response_data.get("Result", {})
-        reference_data = response_data.get("ReferenceData", {}).get("ReferenceItem", {})
-        result_parameters = response_data.get("ResultParameters", {}).get("ResultParameter", [])
+        result_parameters = response_data.get("Result", {}).get("ResultParameters", {}).get("ResultParameter", [])
         
-        result_params = {param["Key"]: param.get("Value", "") for param in result_parameters}
+        result_params = {param.get("Key", ""): param.get("Value", "") for param in result_parameters if "Key" in param}
+        
+        result_code = result_data.get("ResultCode", None)
 
-        # Map fields from the response to the DocType
-        frappe.get_doc({
-            "doctype": "Mpesa Transaction Status",
-            "result_type": result_data.get("ResultType", 0),
-            "result_code": result_data.get("ResultCode"),
-            "result_description": result_data.get("ResultDesc", ""),
-            "originator_conversation_id": result_data.get("OriginatorConversationID", ""),
-            "conversation_id": result_data.get("ConversationID", ""),
-            "transaction_id": result_data.get("TransactionID", ""),
-            "reference_key": reference_data.get("Key", ""),
-            "reference_value": reference_data.get("Value", ""),
-            "amount": result_params.get("Amount", 0),
-            "receipt_no": result_params.get("ReceiptNo", ""),
-            "debit_party_name": result_params.get("DebitPartyName", ""),
-            "debit_party_charges": result_params.get("DebitPartyCharges", ""),
-            "transaction_status": result_params.get("TransactionStatus", ""),
-            "finalised_time": result_params.get("FinalisedTime", ""),
-            "initiated_time": result_params.get("InitiatedTime", ""),
-            "reason_type": result_params.get("ReasonType", ""),
-        }).insert(ignore_permissions=True)
+        if result_code == 0:
+            # Map fields from the response to the DocType
+            mpesa_doc = frappe.new_doc("Mpesa C2B Payment Register")
 
-        frappe.db.commit()
+            mpesa_doc.full_name = result_params.get("DebitPartyName", "")
+            mpesa_doc.transactiontype = result_params.get("TransactionReason", "")
+            mpesa_doc.transid = result_params.get("TransactionID", "")
+            mpesa_doc.transtime = result_params.get("InitiatedTime", "")
+            mpesa_doc.transamount = float(result_params.get("Amount", 0.0))
+            mpesa_doc.businessshortcode = result_params.get("CreditPartyName", "")
+            mpesa_doc.billrefnumber = result_params.get("ReceiptNo", "")
+            mpesa_doc.invoicenumber = result_params.get("TransactionID", "")
+            mpesa_doc.orgaccountbalance = result_params.get("DebitAccountType", "")
+            mpesa_doc.thirdpartytransid = result_params.get("OriginatorConversationID", "")
 
-        return {"status": "success", "message": "Transaction processed successfully"}
+            # Extract MSISDN and Names Safely
+            debit_party = result_params.get("DebitPartyName", "").split(" - ")
+            mpesa_doc.msisdn = debit_party[0] if len(debit_party) > 0 else ""
+
+            name_parts = debit_party[1].split(" ") if len(debit_party) > 1 else ["", "", ""]
+            mpesa_doc.firstname = name_parts[0]
+            mpesa_doc.middlename = name_parts[1] if len(name_parts) > 1 else ""
+            mpesa_doc.lastname = name_parts[-1] if len(name_parts) > 2 else ""
+
+            # Insert and commit changes
+            mpesa_doc.insert(ignore_permissions=True)
+            frappe.db.commit()
+
+            return {"status": "success", "message": "Transaction processed successfully"}
+        
+        else:
+
+            return {"status": "error", "message": "Failed successfully"}
     
     except json.JSONDecodeError as e:
 
