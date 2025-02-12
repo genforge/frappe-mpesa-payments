@@ -202,17 +202,23 @@ def handle_transaction_status_result():
         result_params = {param.get("Key", ""): param.get("Value", "") for param in result_parameters if "Key" in param}
         
         result_code = result_data.get("ResultCode", None)
+        receipt_no = result_params.get("ReceiptNo", "")
+        business_shortcode = result_params.get("CreditPartyName", "").split("-")
 
         if result_code == 0:
+
+            if frappe.db.exists("Mpesa C2B Payment Register", {"transid": receipt_no}):
+                return {"status": "error", "message": f"Duplicate transaction: Receipt No {receipt_no} already exists"}
+            
             # Map fields from the response to the DocType
             mpesa_doc = frappe.new_doc("Mpesa C2B Payment Register")
 
             mpesa_doc.full_name = result_params.get("DebitPartyName", "")
-            mpesa_doc.transactiontype = result_params.get("TransactionReason", "")
-            mpesa_doc.transid = result_params.get("TransactionID", "")
+            mpesa_doc.transactiontype = result_params.get("ReasonType", "")
+            mpesa_doc.transid = result_params.get("ReceiptNo", "")
             mpesa_doc.transtime = result_params.get("InitiatedTime", "")
             mpesa_doc.transamount = float(result_params.get("Amount", 0.0))
-            mpesa_doc.businessshortcode = result_params.get("CreditPartyName", "")
+            mpesa_doc.businessshortcode = business_shortcode[0]
             mpesa_doc.billrefnumber = result_params.get("ReceiptNo", "")
             mpesa_doc.invoicenumber = result_params.get("TransactionID", "")
             mpesa_doc.orgaccountbalance = result_params.get("DebitAccountType", "")
