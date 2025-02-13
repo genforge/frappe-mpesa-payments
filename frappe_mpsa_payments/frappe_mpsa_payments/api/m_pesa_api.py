@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 import frappe, requests
 from frappe import _
 from requests.auth import HTTPBasicAuth
+from frappe.utils.response import json_handler
 import json
 from ..doctype.mpesa_settings.mpesa_settings import (
     get_completed_integration_requests_info,
@@ -196,6 +197,101 @@ def get_mode_of_payment(mpesa_doc):
         mode_of_payment = frappe.get_value("Mpesa C2B Payment Register URL", {"till_number": business_short_code, "register_status": "Success"}, "mode_of_payment")
     return mode_of_payment
     
+@frappe.whitelist(allow_guest=True)
+def handle_transaction_status_result():
+    """Handle the transaction status response from Mpesa"""
+    try:
+        response = frappe.request.data
+        response_data = json.loads(response)
+        result_data = response_data.get("Result", {})
+        result_parameters = response_data.get("Result", {}).get("ResultParameters", {}).get("ResultParameter", [])
+        
+        result_params = {param.get("Key", ""): param.get("Value", "") for param in result_parameters if "Key" in param}
+        
+        result_code = result_data.get("ResultCode", None)
+        receipt_no = result_params.get("ReceiptNo", "")
+        business_shortcode = result_params.get("CreditPartyName", "").split("-")
+
+        if result_code == 0:
+
+            if frappe.db.exists("Mpesa C2B Payment Register", {"transid": receipt_no}):
+                return {"status": "error", "message": f"Duplicate transaction: Receipt No {receipt_no} already exists"}
+            
+            # Map fields from the response to the DocType
+            mpesa_doc = frappe.new_doc("Mpesa C2B Payment Register")
+
+            mpesa_doc.full_name = result_params.get("DebitPartyName", "")
+            mpesa_doc.transactiontype = result_params.get("ReasonType", "")
+            mpesa_doc.transid = result_params.get("ReceiptNo", "")
+            mpesa_doc.transtime = result_params.get("InitiatedTime", "")
+            mpesa_doc.transamount = float(result_params.get("Amount", 0.0))
+            mpesa_doc.businessshortcode = business_shortcode[0]
+            mpesa_doc.billrefnumber = result_params.get("ReceiptNo", "")
+            mpesa_doc.invoicenumber = result_params.get("TransactionID", "")
+            mpesa_doc.orgaccountbalance = result_params.get("DebitAccountType", "")
+            mpesa_doc.thirdpartytransid = result_params.get("OriginatorConversationID", "")
+
+            # Extract MSISDN and Names Safely
+            debit_party = result_params.get("DebitPartyName", "").split(" - ")
+            mpesa_doc.msisdn = debit_party[0] if len(debit_party) > 0 else ""
+
+            name_parts = debit_party[1].split(" ") if len(debit_party) > 1 else ["", "", ""]
+            mpesa_doc.firstname = name_parts[0]
+            mpesa_doc.middlename = name_parts[1] if len(name_parts) > 1 else ""
+            mpesa_doc.lastname = name_parts[-1] if len(name_parts) > 2 else ""
+
+            # Insert and commit changes
+            mpesa_doc.insert(ignore_permissions=True)
+            frappe.db.commit()
+
+            return {"status": "success", "message": "Transaction processed successfully"}
+        
+        else:
+
+            return {"status": "error", "message": "Failed successfully"}
+    
+    except json.JSONDecodeError as e:
+
+        frappe.log_error(f"Failed to decode JSON from Mpesa response: {str(e)}", "Mpesa API Error")
+        return {"status": "error", "message": "Invalid JSON data"}
+
+    except Exception as e:
+        
+        error_message = f"Mpesa Transaction Status Error: {str(e)}"
+
+        if len(response_data) > 140:
+            response_data = json.dumps(response_data)[:100] + "..."
+        frappe.log_error(f"{error_message}\nResponse: {response_data}", "Mpesa API Error")
+        return {"status": "error", "message": error_message}    
+
+@frappe.whitelist(allow_guest=True)
+def handle_queue_timeout():
+    """Handle the timeout response from Mpesa."""
+    try:
+        response = frappe.request.data
+        response_data = json.loads(response)
+
+        frappe.log_error(
+            title="Mpesa Queue Timeout",
+            message=f"Timeout response received: {frappe.as_json(response_data)}"
+        )
+
+        return {"status": "timeout", "message": "Timeout response logged successfully."}
+
+    except json.JSONDecodeError:
+        frappe.log_error(
+            title="Mpesa Timeout Error",
+            message="Failed to decode JSON from timeout response."
+        )
+        return {"status": "error", "message": "Invalid JSON received."}
+
+    except Exception as e:
+        error_message = f"Mpesa Timeout Error: {str(e)}"
+        frappe.log_error(
+            title="Mpesa Timeout Error",
+            message=error_message
+        )
+        return {"status": "error", "message": str(e)}
 
 @frappe.whitelist(allow_guest=True)
 def verify_transaction(**kwargs) -> None:
