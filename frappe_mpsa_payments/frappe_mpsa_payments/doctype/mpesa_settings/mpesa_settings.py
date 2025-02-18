@@ -5,6 +5,7 @@
 import base64
 from json import dumps, loads
 from typing import Any
+from urllib.parse import urlparse
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
@@ -15,13 +16,14 @@ import frappe
 from frappe import _, get_single
 from frappe.integrations.utils import create_request_log
 from frappe.model.document import Document
-from frappe.utils import call_hook_method, fmt_money, get_request_site_address
+from frappe.utils import call_hook_method, fmt_money, get_request_site_address, get_link_to_form
 from frappe.utils.file_manager import get_file_path
 
 from ....utils.doctype_names import PUBLIC_CERTIFICATES_DOCTYPE
 from ....utils.utils import erpnext_app_import_guard
 from .mpesa_connector import MpesaConnector
 from .mpesa_custom_fields import create_custom_pos_fields
+from frappe_mpsa_payments.utils.encoding_initiator_password import generate_security_credential
 
 
 class MpesaSettings(Document):
@@ -390,3 +392,49 @@ def create_mode_of_payment(gateway: str, payment_type: str = "General") -> Docum
         return mode_of_payment
 
     return frappe.get_doc("Mode of Payment", mode_of_payment)
+
+@frappe.whitelist()
+def trigger_transaction_status(mpesa_settings, transaction_id, remarks="OK"):
+
+    try:
+
+        settings = frappe.get_doc("Mpesa Settings", mpesa_settings)
+
+        site_address = get_request_site_address(True)
+        parsed_url = urlparse(site_address)
+        site_url = f"{parsed_url.scheme}://{parsed_url.hostname}"
+                
+        # Retrieve the public certificate path from the Mpesa Public Key Certificate doctype
+        certificate_type = "sandbox_certificate" if settings.sandbox else "production_certificate"
+        public_cert_path = frappe.db.get_single_value("Mpesa Public Key Certificate", certificate_type)
+
+        if not public_cert_path:
+            frappe.throw(f"Certificate file for {certificate_type} not found in {get_link_to_form(r'Mpesa Public Key Certificate', r'Mpesa Public Key Certificate')} doctype.")
+                            
+        # Generate security credential
+        security_credential = generate_security_credential(settings.get_password("initiator_password"), public_cert_path)
+
+        queue_timeout_url = site_url + "/api/method/frappe_mpsa_payments.frappe_mpsa_payments.api.m_pesa_api.handle_queue_timeout"
+        result_url = site_url + "/api/method/frappe_mpsa_payments.frappe_mpsa_payments.api.m_pesa_api.handle_transaction_status_result"
+
+        connector = MpesaConnector(
+            env="production" if not settings.sandbox else "sandbox",
+            app_key=settings.consumer_key,
+            app_secret=settings.get_password("consumer_secret")
+        )
+
+        response = connector.transaction_status(
+            initiator=settings.initiator_name,
+            security_credential=security_credential,
+            transaction_id=transaction_id,
+            party_a=settings.business_shortcode if not settings.sandbox else settings.till_number,
+            identifier_type=4,  # Assuming Organization Short Code
+            remarks=remarks,
+            occasion="",
+            queue_timeout_url=queue_timeout_url,
+            result_url=result_url
+        )
+        return response
+    except Exception as e:
+        frappe.log_error(title="Mpesa Transaction Status Error", message=str(e))
+        return {"status": "error", "message": str(e)}

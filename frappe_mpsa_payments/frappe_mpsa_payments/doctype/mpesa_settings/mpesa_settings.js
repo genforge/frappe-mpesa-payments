@@ -32,5 +32,56 @@ frappe.ui.form.on('Mpesa Settings', {
 			})
 		);
 		frm.dashboard.show();
+	},
+
+	check_transaction_status: function(frm) {
+		if (!frm.doc.initiator_name && !frm.doc.initiator_password) {
+			frappe.throw(__("Please set the initiator name and the initiator password"));
+		}
+		frappe.clear_cache;
+		frappe.prompt(
+			[
+				{
+					label: "Transaction ID",
+					fieldname: "transaction_id",
+					fieldtype: "Data",
+					reqd: 1
+				},
+				{
+					label: "Remarks",
+					fieldname: "remarks",
+					fieldtype: "Small Text",
+				}
+			],
+			(values) => {
+				frappe.call({
+					method: "frappe_mpsa_payments.frappe_mpsa_payments.doctype.mpesa_settings.mpesa_settings.trigger_transaction_status",
+					args: {
+						mpesa_settings: frm.doc.name,
+						transaction_id: values.transaction_id,
+						remarks: values.remarks
+					},
+					callback: (r) => {
+						if (r.message) {
+							if (r.message.ResponseCode === "0") {
+								frappe.msgprint({
+									message: __("Transaction Status: {0}", [r.message.ResponseDescription]),
+									title: "Success",
+									indicator: "green",
+								});
+							} else {
+								frappe.msgprint({
+									message: r.message.errorCode + ": " + r.message.errorMessage,
+									title: "Error",
+									indicator: "red",
+								});
+							}
+						}
+					}
+				});
+			},
+			__("Transaction Status Query"),
+			__("Submit")
+		);
 	}
 });
