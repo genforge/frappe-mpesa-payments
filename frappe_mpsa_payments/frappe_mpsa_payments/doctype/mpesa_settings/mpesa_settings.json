@@ -22,6 +22,7 @@
   "business_shortcode",
   "online_passkey",
   "get_account_balance",
+  "check_transaction_status",
   "account_balance"
  ],
  "fields": [
@@ -126,10 +127,15 @@
    "fieldname": "initiator_password",
    "fieldtype": "Password",
    "label": "Initiator Password"
+  },
+  {
+   "fieldname": "check_transaction_status",
+   "fieldtype": "Button",
+   "label": "Check Transaction Status"
   }
  ],
  "links": [],
- "modified": "2025-01-30 10:57:43.104261",
+ "modified": "2025-02-18 11:17:04.338605",
  "modified_by": "Administrator",
  "module": "Frappe Mpsa Payments",
  "name": "Mpesa Settings",
